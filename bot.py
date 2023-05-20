@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 class Twooter:
+
+    
     def __init__(self):
+        base_dir = Path(__file__).parent
+
         env = environ.Env()
         environ.Env.read_env()
 
@@ -31,12 +35,12 @@ class Twooter:
         self.media_dir = Path("media")
         self.media_dir.mkdir(exist_ok=True)
 
-        self.mastodon = Mastodon(client_id="twooter.secret")
+        self.mastodon = Mastodon(client_id=base_dir / "twooter.secret")
         self.mastodon.log_in(
             env("MASTODON_USER"),
             env("MASTODON_PW"),
         )
-        self.cache_file = Path(".cache")
+        self.cache_file = base_dir / ".cache"
         self.tooted_tweet_ids = self.read_from_cache()
 
     def read_from_cache(self):
