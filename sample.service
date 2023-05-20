@@ -1,0 +1,9 @@
+[Unit]
+Description=Twooter
+After=multi-user.target
+[Service]
+Type=simple
+Restart=always
+ExecStart=/path/to/venv/python /path/to/bot.py
+[Install]
+WantedBy=multi-user.target

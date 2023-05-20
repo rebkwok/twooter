@@ -12,5 +12,6 @@ TWITTER_USER=
 
 # MASTODON
 # Create app on your server and save credentials in a file named twooter.secret
+# see https://mastodonpy.readthedocs.io/en/stable/index.html#usage
 MASTONDON_USER=
 MASTONDON_PW=
