@@ -11,6 +11,7 @@ from mastodon import Mastodon
 
 logger = logging.getLogger(__name__)
 
+
 class Twooter:
     def __init__(self):
         env = environ.Env()
@@ -30,7 +31,7 @@ class Twooter:
         self.media_dir = Path("media")
         self.media_dir.mkdir(exist_ok=True)
 
-        self.mastodon = Mastodon(client_id='twooter.secret')
+        self.mastodon = Mastodon(client_id="twooter.secret")
         self.mastodon.log_in(
             env("MASTODON_USER"),
             env("MASTODON_PW"),
@@ -43,7 +44,7 @@ class Twooter:
             self.cache_file.touch()
             return set()
         else:
-            tooted_ids = self.cache_file.read_text().split('\n')
+            tooted_ids = self.cache_file.read_text().split("\n")
             return set([int(tid) for tid in tooted_ids if tid])
 
     def get_tweets(self):
@@ -56,27 +57,37 @@ class Twooter:
         )
 
         def _recent(tw):
-            tw_time = datetime.strptime(tw.created_at,'%a %b %d %H:%M:%S +0000 %Y')
+            tw_time = datetime.strptime(tw.created_at, "%a %b %d %H:%M:%S +0000 %Y")
             return (datetime.now() - tw_time).total_seconds() < self.look_back_seconds
 
-        # only return tweets within last minute
-        return [
-            tweet for tweet in tweets if tweet.id not in self.tooted_tweet_ids
-            and _recent(tweet)
-        ]
+        # only return tweets within last minute, in reverse order (so we toot the
+        # earliest first)
+        for i in range(len(tweets)):
+            tweet = tweets.pop()
+            if tweet.id not in self.tooted_tweet_ids and _recent(tweet):
+                yield tweet
 
-    def retrieve_tweet(self, tweet_id):
+    def retrieve_tweet_for_tooting(self, tweet_id):
         # get the tweet and download any media
         tweet = self.api.get_status(tweet_id, tweet_mode="extended")
         has_photos = False
-        for media in tweet.entities["media"]:
+
+        text = tweet.full_text
+        for media in tweet.entities.get("media", []):
             self.download_image(tweet_id, media["media_url"])
+            # remove the shortened twitter url
+            text = text.replace(media["url"], "")
             has_photos = True
-        return tweet.full_text, has_photos
+
+        # replace any urls in the tweet with their expanded version
+        for url in tweet.entities.get("urls", []):
+            text = text.replace(url["url"], url["expanded_url"])
+
+        return text, has_photos
 
     def download_image(self, tweet_id, media_url):
         filename = media_url.split("/")[-1]
-        download_dir = (self.media_dir / str(tweet_id))
+        download_dir = self.media_dir / str(tweet_id)
         download_dir.mkdir(exist_ok=True)
         download_file = download_dir / filename
         # Send GET request
@@ -86,7 +97,9 @@ class Twooter:
             with open(download_file, "wb") as f:
                 f.write(response.content)
         else:
-            logger.error("Image download %s failed: %s", media_url, response.status_code)
+            logger.error(
+                "Image download %s failed: %s", media_url, response.status_code
+            )
 
     def toot(self, tweet_text, tweet_id, has_photos):
         # first create the media posts
@@ -94,33 +107,35 @@ class Twooter:
         if has_photos:
             for photo_file in (self.media_dir / str(tweet_id)).iterdir():
                 media_dict = self.mastodon.media_post(photo_file)
-                media_ids.append(media_dict['id'])
+                media_ids.append(media_dict["id"])
         # now create the status update with the media ids
         self.mastodon.status_post(tweet_text, media_ids=media_ids)
 
     def cache(self, tweet_id):
         self.tooted_tweet_ids.add(tweet_id)
         with open(self.cache_file, "a") as out_f:
-            out_f.write(f'{tweet_id}\n')
+            out_f.write(f"{tweet_id}\n")
 
-    def repost(self):
+    def tweets_to_toots(self):
         tweets = self.get_tweets()
-        if tweets:
-            for tweet in tweets:
-                logger.info("Tweet found, tooting...")
-                tweet_text, has_photos = self.retrieve_tweet(tweet.id)
-                self.toot(tweet_text, tweet.id, has_photos)
-                self.last_tweet_id = tweet.id
-                self.cache(tweet.id)
+        for tweet in tweets:
+            logger.info("Tweet %s found, tooting...", tweet.id)
+            tweet_text, has_photos = self.retrieve_tweet_for_tooting(tweet.id)
+            # self.toot(tweet_text, tweet.id, has_photos)
+            print(tweet_text)
+            self.last_tweet_id = tweet.id
+            self.cache(tweet.id)
 
     def run(self):
         while True:
             logger.info("Fetching tweets")
-            self.repost()
+            self.tweets_to_toots()
             time.sleep(30)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s:%(levelname)s:%(message)s"
+    )
     twooter = Twooter()
     twooter.run()
