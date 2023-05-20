@@ -1,0 +1,15 @@
+# TWITTER
+# Consumer keys
+TWITTER_API_KEY=
+TWITTER_API_SECRET=
+# Auth
+TWITTER_BEARER_TOKEN=
+TWITTER_ACCESS_KEY=
+ACCESS_SECRET=
+# twitter handle
+TWITTER_USER=
+
+# MASTODON
+# Create app on your server and save credentials in a file named twooter.secret
+MASTONDON_USER=
+MASTONDON_PW=

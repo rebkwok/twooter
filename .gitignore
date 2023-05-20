@@ -1,0 +1,12 @@
+.env
+.venv/
+venv/
+
+*.pyc
+__pycache__/
+
+media/
+
+*.secret
+
+.cache

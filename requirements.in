@@ -1,0 +1,9 @@
+mastodon.py
+python-environ
+python-twitter
+tweepy
+
+pip-tools
+black
+isort
+
