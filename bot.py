@@ -125,7 +125,7 @@ class Twooter:
         for tweet in tweets:
             logger.info("Tweet %s found, tooting...", tweet.id)
             tweet_text, has_photos = self.retrieve_tweet_for_tooting(tweet.id)
-            # self.toot(tweet_text, tweet.id, has_photos)
+            self.toot(tweet_text, tweet.id, has_photos)
             print(tweet_text)
             self.last_tweet_id = tweet.id
             self.cache(tweet.id)
