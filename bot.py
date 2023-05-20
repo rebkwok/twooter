@@ -1,4 +1,5 @@
 import logging
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -13,8 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class Twooter:
-
-    
     def __init__(self):
         base_dir = Path(__file__).parent
 
@@ -112,6 +111,8 @@ class Twooter:
             for photo_file in (self.media_dir / str(tweet_id)).iterdir():
                 media_dict = self.mastodon.media_post(photo_file)
                 media_ids.append(media_dict["id"])
+            # now delete the downloaded photos
+            shutil.rmtree(self.media_dir / str(tweet_id))
         # now create the status update with the media ids
         self.mastodon.status_post(tweet_text, media_ids=media_ids)
 
@@ -122,13 +123,17 @@ class Twooter:
 
     def tweets_to_toots(self):
         tweets = self.get_tweets()
+        count = 0
         for tweet in tweets:
+            count += 1
             logger.info("Tweet %s found, tooting...", tweet.id)
             tweet_text, has_photos = self.retrieve_tweet_for_tooting(tweet.id)
             self.toot(tweet_text, tweet.id, has_photos)
             print(tweet_text)
             self.last_tweet_id = tweet.id
             self.cache(tweet.id)
+        if count == 0:
+            logger.info("Nothing to toot about")
 
     def run(self):
         while True:
