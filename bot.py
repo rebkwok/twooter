@@ -3,23 +3,24 @@ import shutil
 import time
 from datetime import datetime
 from pathlib import Path
+import sys
 
 import environ
 import requests
 import tweepy
 import twitter
 from mastodon import Mastodon
+from mastodon.errors import MastodonUnauthorizedError, MastodonIllegalArgumentError
 
 logger = logging.getLogger(__name__)
+
+env = environ.Env()
+environ.Env.read_env()
 
 
 class Twooter:
     def __init__(self):
-        base_dir = Path(__file__).parent
-
-        env = environ.Env()
-        environ.Env.read_env()
-
+        self.base_dir = Path(__file__).parent
         self.look_back_seconds = env.int("LOOKBACK_SECONDS", default=60)
 
         self.twitter_user = env("TWITTER_USER")
@@ -34,13 +35,34 @@ class Twooter:
         self.media_dir = Path("media")
         self.media_dir.mkdir(exist_ok=True)
 
-        self.mastodon = Mastodon(client_id=base_dir / "twooter.secret")
-        self.mastodon.log_in(
-            env("MASTODON_USER"),
-            env("MASTODON_PW"),
-        )
-        self.cache_file = base_dir / ".cache"
+        self.mastodon = self.mastodon_login()
+        self.cache_file = self.base_dir / ".cache"
         self.tooted_tweet_ids = self.read_from_cache()
+
+    def mastodon_login(self):
+        usercred_file = self.base_dir / "twooter_usercred.secret"
+        if usercred_file.exists():
+            # Create API instance with existing access token
+            mastodon = Mastodon(access_token=usercred_file)
+            # Check that credentials are valid
+            try:
+                mastodon.account_verify_credentials()
+                return mastodon
+            except MastodonUnauthorizedError:
+                ...
+        # Either this is a first login and no credential file exists, or
+        # the existing credtials could not be verified
+        # Login and fetch a new token
+        mastodon = Mastodon(client_id=self.base_dir / "twooter.secret")
+        try:
+            mastodon.log_in(
+                env("MASTODON_USER"), env("MASTODON_PW"), to_file=usercred_file
+            )
+            mastodon.account_verify_credentials()
+            return mastodon
+        except (MastodonUnauthorizedError, MastodonIllegalArgumentError):
+            logger.error("Could not login to Mastodon account")
+            sys.exit(1)
 
     def read_from_cache(self):
         if not self.cache_file.exists():
